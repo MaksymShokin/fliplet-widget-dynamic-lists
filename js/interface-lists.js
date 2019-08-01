@@ -8,6 +8,7 @@ var linkAddEntryProvider;
 var linkEditEntryProvider;
 var filePickerPromises = [];
 var withError = false;
+var selectedFoldersId = [];
 
 var addEntryLinkData = $.extend(true, {
   action: 'screen',
@@ -221,6 +222,7 @@ function attahObservers() {
       var fieldId = $(this).parents('.picker-provider-button').data('field-id');
       var field = _.find(widgetData['summary-fields'], { id: fieldId });
 
+      $('.text-danger').addClass('hidden');
       if (field) {
         initFilePickerProvider(field);
       } else {
@@ -237,6 +239,7 @@ function attahObservers() {
       var fieldId = $(this).parents('.picker-provider-button').data('field-id');
       var field = _.find(widgetData.detailViewOptions, { id: fieldId });
 
+      $('.text-danger').addClass('hidden');
       if (field) {
         initFilePickerProvider(field);
       } else {
@@ -248,7 +251,32 @@ function attahObservers() {
 
         initFilePickerProvider(field);
       }
-    });
+    })
+    .on('change', '[name="image_type_select"]', function() {
+      var dataType = $(this).val();
+      var id = $(this).data('current-id')
+
+      switch (dataType) {
+        case 'all-folders':
+          $(this).parents('.rTableRow')
+            .find('.picker-provider-button, .folders-only').removeClass('hidden').end()
+            .find('.url-only').addClass('hidden');
+            selectedFoldersId.push(id)
+          break;
+        case 'url':
+          $(this).parents('.rTableRow')
+            .find('.picker-provider-button, .folders-only').addClass('hidden').end()
+            .find('.url-only').removeClass('hidden');
+            var index = selectedFoldersId.indexOf(id);
+            selectedFoldersId.splice(index, 1);
+          break;
+        default:
+          $(this).parents('.rTableRow')
+            .find('.picker-provider-button, .url-only').addClass('hidden').end()
+            .find('.folders-only').removeClass('hidden');
+      }
+    })
+
   $('[data-toggle="tooltip"]').tooltip();
   $('form').submit(function (event) {
     event.preventDefault();
@@ -282,7 +310,7 @@ function attahObservers() {
             value: widgetData.userAdminColumn,
             field: '#select_user_admin'
           });
-          
+
           values.forEach(function(field) {
             if (!validate(field.value)) {
               errors.push(field.field);
@@ -330,7 +358,7 @@ function attahObservers() {
           if (!widgetData.userNameFields && !widgetData.userNameFields.length) {
             errors.push('#user-name-column-fields-tokenfield');
           }
-          
+
           values.forEach(function(field) {
             if (!validate(field.value)) {
               errors.push(field.field);
@@ -369,11 +397,11 @@ function attahObservers() {
             value: widgetData.userEmailColumn,
             field: '#select_user_email'
           });
-          
+
           if (!widgetData.userNameFields && !widgetData.userNameFields.length) {
             errors.push('#user-name-column-fields-tokenfield');
           }
-          
+
           values.forEach(function(field) {
             if (!validate(field.value)) {
               errors.push(field.field);
@@ -408,7 +436,7 @@ function attahObservers() {
             value: widgetData.pollColumn,
             field: '#select_poll_data'
           });
-          
+
           values.forEach(function(field) {
             if (!validate(field.value)) {
               errors.push(field.field);
@@ -443,7 +471,7 @@ function attahObservers() {
             value: widgetData.pollColumn,
             field: '#select_survey_data'
           });
-          
+
           values.forEach(function(field) {
             if (!validate(field.value)) {
               errors.push(field.field);
@@ -478,7 +506,7 @@ function attahObservers() {
             value: widgetData.pollColumn,
             field: '#select_questions_data'
           });
-          
+
           values.forEach(function(field) {
             if (!validate(field.value)) {
               errors.push(field.field);
@@ -509,8 +537,44 @@ function attahObservers() {
       });
   });
 
+    function highlightError(fieldIds) {
+      _.each(fieldIds, function(id) {
+        $('[data-field-id="' + id + '"] .text-danger').removeClass('hidden');
+      });
+    }
+
+    function checkImageFoldersSelection() {
+      if (!widgetData['summary-fields']) {
+        highlightError(selectedFoldersId);
+        return false;
+      }
+
+      var totalArray = _.concat(widgetData.detailViewOptions, widgetData['summary-fields']);
+      var errorInputIds = _.filter(selectedFoldersId, function(id) {
+          return !_.some(totalArray, function(item) {
+            return item.id === id && item.folder;
+          });
+      });
+
+      highlightError(errorInputIds);
+      return errorInputIds.length === 0;
+    }
+
   Fliplet.Widget.onSaveRequest(function () {
-    $('form').submit();
+    var isImageFoldersSelected = checkImageFoldersSelection();
+    
+    if (isImageFoldersSelected || filePickerPromises.length) {
+        $('.text-danger').addClass('hidden');
+        $('form').submit();
+        return;
+    }
+
+    if (!isImageFoldersSelected) {
+        Fliplet.Modal.alert({
+          title: 'Invalid configuration',
+          message: 'Please review settings in <strong>Data view settings</strong> to continue.'
+        });
+    }
   });
 }
 
